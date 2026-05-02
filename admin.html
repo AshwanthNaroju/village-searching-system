@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel | Smart Location Finder</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+  .admin-sidebar { background: linear-gradient(180deg, #1e1b4b 0%, #0f172a 100%); }
+  .card-hover:hover { transform: translateY(-4px); transition: all 0.3s ease; }
+</style>
+</head>
+<body>
+
+<!-- Admin Login -->
+<div id="adminLoginView" class="min-h-screen gradient-bg flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+    <div class="text-center mb-8">
+      <i class="fas fa-user-shield text-5xl text-indigo-600"></i>
+      <h1 class="text-3xl font-bold mt-3">Admin Portal</h1>
+      <p class="text-gray-500">Smart Location Finder</p>
+    </div>
+    <input type="email" id="adminEmail" placeholder="Admin Email" class="w-full p-3 border rounded-lg mb-3">
+    <input type="password" id="adminPassword" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
+    <button onclick="adminAuth.login()" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold">Login</button>
+    <p id="adminMsg" class="text-sm text-center mt-4 text-red-500"></p>
+    <div class="mt-4 text-center"><a href="/" class="text-indigo-600 text-sm">← Back to User Portal</a></div>
+  </div>
+</div>
+
+<!-- Admin Dashboard -->
+<div id="adminDashboard" class="hidden flex h-screen">
+  <!-- Sidebar -->
+  <div class="admin-sidebar w-64 text-white flex flex-col">
+    <div class="p-6 border-b border-purple-800">
+      <i class="fas fa-chart-line text-2xl mr-2"></i>
+      <span class="font-bold text-xl">Admin Console</span>
+    </div>
+    <nav class="flex-1 p-4 space-y-2">
+      <button onclick="admin.showTab('dashboard')" id="tabDashboardBtn" class="w-full text-left p-3 rounded-lg hover:bg-purple-800 transition flex items-center gap-3 bg-purple-800">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+      </button>
+      <button onclick="admin.showTab('users')" id="tabUsersBtn" class="w-full text-left p-3 rounded-lg hover:bg-purple-800 transition flex items-center gap-3">
+        <i class="fas fa-users"></i> User Management
+      </button>
+      <button onclick="admin.showTab('memberships')" id="tabMembershipsBtn" class="w-full text-left p-3 rounded-lg hover:bg-purple-800 transition flex items-center gap-3">
+        <i class="fas fa-crown"></i> Upgrade Requests
+      </button>
+      <button onclick="admin.showTab('feedback')" id="tabFeedbackBtn" class="w-full text-left p-3 rounded-lg hover:bg-purple-800 transition flex items-center gap-3">
+        <i class="fas fa-comments"></i> Feedback
+      </button>
+      <button onclick="admin.showTab('analytics')" id="tabAnalyticsBtn" class="w-full text-left p-3 rounded-lg hover:bg-purple-800 transition flex items-center gap-3">
+        <i class="fas fa-chart-bar"></i> Analytics
+      </button>
+    </nav>
+    <div class="p-4 border-t border-purple-800">
+      <button onclick="adminAuth.logout()" class="w-full bg-red-600 text-white px-4 py-2 rounded-lg text-sm">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 overflow-y-auto bg-gray-100">
+    <!-- Dashboard Tab -->
+    <div id="dashboardTab" class="p-6">
+      <h2 class="text-2xl font-bold mb-6">📊 Dashboard Overview</h2>
+      <div class="grid md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-5 rounded-xl shadow card-hover">
+          <i class="fas fa-users text-3xl text-blue-500"></i>
+          <p class="text-2xl font-bold mt-2" id="statTotalUsers">0</p>
+          <p class="text-gray-500">Total Users</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow card-hover">
+          <i class="fas fa-check-circle text-3xl text-green-500"></i>
+          <p class="text-2xl font-bold mt-2" id="statActiveUsers">0</p>
+          <p class="text-gray-500">Active Users</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow card-hover">
+          <i class="fas fa-clock text-3xl text-yellow-500"></i>
+          <p class="text-2xl font-bold mt-2" id="statPendingUsers">0</p>
+          <p class="text-gray-500">Pending Approval</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow card-hover">
+          <i class="fas fa-search text-3xl text-purple-500"></i>
+          <p class="text-2xl font-bold mt-2" id="statTotalSearches">0</p>
+          <p class="text-gray-500">Total Searches</p>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-5">
+        <canvas id="membershipChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="usersTab" class="hidden p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">👥 User Management</h2>
+        <button onclick="admin.exportUsers()" class="bg-green-600 text-white px-4 py-2 rounded-lg">
+          <i class="fas fa-download"></i> Export CSV
+        </button>
+      </div>
+      <div class="bg-white rounded-xl shadow overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Name</th>
+                <th class="px-6 py-3 text-left">Email</th>
+                <th class="px-6 py-3 text-left">Membership</th>
+                <th class="px-6 py-3 text-left">Status</th>
+                <th class="px-6 py-3 text-left">Searches</th>
+                <th class="px-6 py-3 text-left">Joined</th>
+                <th class="px-6 py-3 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersTable" class="divide-y divide-gray-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Membership Requests Tab -->
+    <div id="membershipsTab" class="hidden p-6">
+      <h2 class="text-2xl font-bold mb-6">👑 Membership Upgrade Requests</h2>
+      <div id="membershipRequestsList" class="space-y-4"></div>
+    </div>
+
+    <!-- Feedback Tab -->
+    <div id="feedbackTab" class="hidden p-6">
+      <h2 class="text-2xl font-bold mb-6">💬 User Feedback</h2>
+      <div id="feedbackList" class="space-y-4"></div>
+    </div>
+
+    <!-- Analytics Tab -->
+    <div id="analyticsTab" class="hidden p-6">
+      <h2 class="text-2xl font-bold mb-6">📈 Advanced Analytics</h2>
+      <div class="bg-white rounded-xl shadow p-5">
+        <canvas id="trendsChart" height="200"></canvas>
+      </div>
+      <div class="mt-4 text-center text-gray-500 text-sm">
+        <p>Showing search trends for the last 7 days</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'http://localhost:5000/api';
+let token = localStorage.getItem('adminToken');
+
+async function apiCall(endpoint, options = {}) {
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '', ...options.headers }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'API Error');
+  return data;
+}
+
+const adminAuth = {
+  async login() {
+    const email = document.getElementById('adminEmail').value;
+    const password = document.getElementById('adminPassword').value;
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.token && data.user.role === 'admin') {
+        token = data.token;
+        localStorage.setItem('adminToken', token);
+        localStorage.setItem('adminUser', JSON.stringify(data.user));
+        document.getElementById('adminLoginView').classList.add('hidden');
+        document.getElementById('adminDashboard').classList.remove('hidden');
+        admin.loadDashboard();
+      } else {
+        document.getElementById('adminMsg').innerText = 'Invalid admin credentials';
+      }
+    } catch(e) {
+      document.getElementById('adminMsg').innerText = 'Login failed';
+    }
+  },
+  logout() {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    token = null;
+    document.getElementById('adminLoginView').classList.remove('hidden');
+    document.getElementById('adminDashboard').classList.add('hidden');
+  },
+  checkSession() {
+    const savedToken = localStorage.getItem('adminToken');
+    if (savedToken) {
+      token = savedToken;
+      document.getElementById('adminLoginView').classList.add('hidden');
+      document.getElementById('adminDashboard').classList.remove('hidden');
+      admin.loadDashboard();
+      return true;
+    }
+    return false;
+  }
+};
+
+const admin = {
+  currentTab: 'dashboard',
+  
+  async showTab(tab) {
+    ['dashboard', 'users', 'memberships', 'feedback', 'analytics'].forEach(t => {
+      document.getElementById(`${t}Tab`).classList.add('hidden');
+    });
+    document.getElementById(`${tab}Tab`).classList.remove('hidden');
+    
+    ['Dashboard', 'Users', 'Memberships', 'Feedback', 'Analytics'].forEach(t => {
+      const btn = document.getElementById(`tab${t}Btn`);
+      if (btn) btn.classList.remove('bg-purple-800');
+    });
+    document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`).classList.add('bg-purple-800');
+    
+    this.currentTab = tab;
+    if (tab === 'dashboard') await this.loadDashboard();
+    if (tab === 'users') await this.loadUsers();
+    if (tab === 'memberships') await this.loadMembershipRequests();
+    if (tab === 'feedback') await this.loadFeedback();
+    if (tab === 'analytics') await this.loadAnalytics();
+  },
+  
+  async loadDashboard() {
+    try {
+      const stats = await apiCall('/admin/stats');
+      document.getElementById('statTotalUsers').innerText = stats.totalUsers;
+      document.getElementById('statActiveUsers').innerText = stats.activeUsers;
+      document.getElementById('statPendingUsers').innerText = stats.pendingUsers;
+      document.getElementById('statTotalSearches').innerText = stats.totalSearches;
+      
+      const membershipData = { NORMAL: 0, PREMIUM: 0, ULTRA_PREMIUM: 0 };
+      stats.membershipStats.forEach(ms => { 
+        if (ms.membership === 'NORMAL') membershipData.NORMAL = ms.count;
+        else if (ms.membership === 'PREMIUM') membershipData.PREMIUM = ms.count;
+        else if (ms.membership === 'ULTRA_PREMIUM') membershipData.ULTRA_PREMIUM = ms.count;
+      });
+      
+      const ctx = document.getElementById('membershipChart').getContext('2d');
+      if (window.chart) window.chart.destroy();
+      window.chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Normal', 'Premium', 'Ultra Premium'],
+          datasets: [{ label: 'Users', data: [membershipData.NORMAL, membershipData.PREMIUM, membershipData.ULTRA_PREMIUM], backgroundColor: '#4f46e5' }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { position: 'top' },
+            title: { display: true, text: 'Membership Distribution' }
+          }
+        }
+      });
+    } catch(e) { console.error(e); }
+  },
+  
+  async loadUsers() {
+    try {
+      const users = await apiCall('/admin/users');
+      document.getElementById('adminUsersTable').innerHTML = users.map(u => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-3">${u.name}</td>
+          <td class="px-6 py-3">${u.email}</td>
+          <td class="px-6 py-3">
+            <select onchange="admin.updateMembership(${u.id}, this.value)" class="border rounded p-1 text-sm">
+              <option ${u.membership === 'NORMAL' ? 'selected' : ''} value="normal">NORMAL</option>
+              <option ${u.membership === 'PREMIUM' ? 'selected' : ''} value="premium">PREMIUM</option>
+              <option ${u.membership === 'ULTRA_PREMIUM' ? 'selected' : ''} value="ultra">ULTRA</option>
+            </select>
+          </td>
+          <td class="px-6 py-3">
+            <button onclick="admin.toggleStatus(${u.id}, '${u.status}')" class="px-3 py-1 rounded-full text-xs font-semibold ${u.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+              ${u.status === 'active' ? 'Active' : 'Pending'}
+            </button>
+          </td>
+          <td class="px-6 py-3">${u.search_count_today || 0}</td>
+          <td class="px-6 py-3 text-xs">${new Date(u.created_at).toLocaleDateString()}</td>
+          <td class="px-6 py-3">
+            <button onclick="admin.deleteUser(${u.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) { console.error(e); }
+  },
+  
+  async updateMembership(userId, membership) {
+    try {
+      await apiCall(`/admin/users/${userId}/membership`, { method: 'PUT', body: JSON.stringify({ membership }) });
+      alert('Membership updated');
+      await this.loadUsers();
+    } catch(e) { alert('Update failed'); }
+  },
+  
+  async toggleStatus(userId, currentStatus) {
+    const newStatus = currentStatus === 'active' ? 'pending' : 'active';
+    try {
+      await apiCall(`/admin/users/${userId}/status`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
+      await this.loadUsers();
+      await this.loadDashboard();
+    } catch(e) { alert('Status update failed'); }
+  },
+  
+  async deleteUser(userId) {
+    if (!confirm('Delete this user permanently?')) return;
+    try {
+      await apiCall(`/admin/users/${userId}`, { method: 'DELETE' });
+      await this.loadUsers();
+      await this.loadDashboard();
+    } catch(e) { alert('Delete failed'); }
+  },
+  
+  async loadMembershipRequests() {
+    try {
+      const requests = await apiCall('/admin/upgrade-requests');
+      document.getElementById('membershipRequestsList').innerHTML = requests.length ? 
+        requests.map(r => `
+          <div class="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-400">
+            <div class="flex justify-between">
+              <b>${r.user_name}</b>
+              <span class="text-sm text-gray-500">${new Date(r.created_at).toLocaleString()}</span>
+            </div>
+            <p>Requested: <span class="font-semibold">${r.requested_membership}</span></p>
+            <div class="mt-3 flex gap-2">
+              <button onclick="admin.approveUpgrade(${r.id})" class="bg-green-500 text-white px-4 py-1 rounded text-sm">Approve</button>
+              <button onclick="admin.rejectUpgrade(${r.id})" class="bg-red-500 text-white px-4 py-1 rounded text-sm">Reject</button>
+            </div>
+          </div>
+        `).join('') : '<p class="text-gray-500 text-center py-8">No pending upgrade requests</p>';
+    } catch(e) { console.error(e); }
+  },
+  
+  async approveUpgrade(requestId) {
+    try {
+      await apiCall(`/admin/upgrade-requests/${requestId}/approve`, { method: 'POST' });
+      alert('Upgrade approved!');
+      await this.loadMembershipRequests();
+      await this.loadDashboard();
+      await this.loadUsers();
+    } catch(e) { alert('Approval failed'); }
+  },
+  
+  async rejectUpgrade(requestId) {
+    try {
+      await apiCall(`/admin/upgrade-requests/${requestId}/reject`, { method: 'POST' });
+      alert('Request rejected');
+      await this.loadMembershipRequests();
+    } catch(e) { alert('Rejection failed'); }
+  },
+  
+  async loadFeedback() {
+    try {
+      const feedbacks = await apiCall('/admin/feedback');
+      document.getElementById('feedbackList').innerHTML = feedbacks.map(f => `
+        <div class="bg-white rounded-lg shadow p-4 border-l-4 ${f.status === 'pending' ? 'border-red-400' : 'border-green-400'}">
+          <div class="flex justify-between">
+            <b>${f.user_name}</b>
+            <span class="text-xs text-gray-400">${new Date(f.created_at).toLocaleString()}</span>
+          </div>
+          <p class="mt-2">${f.message}</p>
+          ${f.status === 'pending' ? 
+            `<div class="mt-3"><button onclick="admin.resolveFeedback(${f.id})" class="bg-green-500 text-white px-3 py-1 rounded text-sm">Mark Resolved</button></div>` : 
+            '<span class="text-xs text-green-600 mt-2 inline-block">✓ Resolved</span>'
+          }
+        </div>
+      `).join('');
+    } catch(e) { console.error(e); }
+  },
+  
+  async resolveFeedback(feedbackId) {
+    try {
+      await apiCall(`/admin/feedback/${feedbackId}/resolve`, { method: 'PUT' });
+      await this.loadFeedback();
+    } catch(e) { alert('Failed to resolve'); }
+  },
+  
+  async loadAnalytics() {
+    try {
+      // Try to get search trends
+      const response = await fetch(`${API_URL}/admin/searches/trends`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const ctx = document.getElementById('trendsChart').getContext('2d');
+        if (window.trendChart) window.trendChart.destroy();
+        window.trendChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: data.dates || ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
+            datasets: [{ 
+              label: 'Searches', 
+              data: data.counts || [0, 0, 0, 0, 0, 0, 0], 
+              borderColor: '#4f46e5', 
+              backgroundColor: 'rgba(79, 70, 229, 0.1)',
+              tension: 0.3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: { position: 'top' },
+              title: { display: true, text: 'Search Trends (Last 7 Days)' }
+            }
+          }
+        });
+      } else {
+        // If no data, show sample chart
+        this.showSampleChart();
+      }
+    } catch(e) { 
+      console.error('Analytics error:', e);
+      this.showSampleChart();
+    }
+  },
+  
+  showSampleChart() {
+    const ctx = document.getElementById('trendsChart').getContext('2d');
+    if (window.trendChart) window.trendChart.destroy();
+    window.trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
+        datasets: [{ 
+          label: 'Searches (Demo Data)', 
+          data: [12, 19, 15, 17, 14, 22, 18], 
+          borderColor: '#4f46e5', 
+          backgroundColor: 'rgba(79, 70, 229, 0.1)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: 'Search Trends (Sample Data - Start searching to see real data)' }
+        }
+      }
+    });
+  },
+  
+  exportUsers() {
+    const table = document.getElementById('adminUsersTable');
+    const rows = table.querySelectorAll('tr');
+    let csv = 'Name,Email,Membership,Status,Searches,Joined\n';
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length) {
+        csv += `${cells[0].innerText},${cells[1].innerText},${cells[2].innerText},${cells[3].innerText},${cells[4].innerText},${cells[5].innerText}\n`;
+      }
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'users_export.csv';
+    a.click();
+  }
+};
+
+// Check session
+adminAuth.checkSession();
+
+window.adminAuth = adminAuth;
+window.admin = admin;
+</script>
+</body>
+</html>
